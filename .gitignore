@@ -1,0 +1,6 @@
+/.env
+/vendor/
+/storage/imports/*
+!/storage/imports/.gitkeep
+/.phpunit.cache/
+/test-results/

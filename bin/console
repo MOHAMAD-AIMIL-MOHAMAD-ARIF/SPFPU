@@ -1,0 +1,22 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+use SPFPU\Core\{Config,Database,Validation};
+
+$root=dirname(__DIR__);require $root.'/vendor/autoload.php';Config::load($root);$command=$argv[1]??'help';
+try {
+    if($command==='migrate'){
+        foreach(glob($root.'/database/migrations/*.sql')?:[] as$file){Database::connection()->exec((string)file_get_contents($file));echo 'Migrated: '.basename($file).PHP_EOL;}exit(0);
+    }
+    if($command==='seed:admin'){
+        $db=Database::connection();if((int)$db->query('SELECT COUNT(*) FROM users')->fetchColumn()>0)throw new RuntimeException('Seed refused: at least one user already exists.');
+        $name=Config::get('SPFPU_ADMIN_NAME');$username=Config::get('SPFPU_ADMIN_USERNAME');$email=Config::get('SPFPU_ADMIN_EMAIL');$password=Config::get('SPFPU_ADMIN_PASSWORD');
+        if(!$name||!$username||!$email||!$password)throw new RuntimeException('Set all SPFPU_ADMIN_* environment variables.');if(!preg_match('/^[A-Za-z0-9._-]{3,50}$/',$username)||!filter_var($email,FILTER_VALIDATE_EMAIL)||($e=Validation::password($password)))throw new RuntimeException($e?:'Initial Admin details are invalid.');
+        $s=$db->prepare("INSERT INTO users(fullname,username,username_norm,email,email_norm,role,status,password_hash) VALUES (?,?,?,?,?,'Admin','Active',?)");$s->execute([$name,$username,mb_strtolower($username),$email,mb_strtolower($email),password_hash($password,PASSWORD_ARGON2ID)]);echo 'Initial Admin created.'.PHP_EOL;exit(0);
+    }
+    if($command==='imports:cleanup'){
+        $db=Database::connection();$rows=$db->query('SELECT token,temp_path FROM import_previews WHERE expires_at<NOW()')->fetchAll();foreach($rows as$row){if(is_file($row['temp_path']))unlink($row['temp_path']);}$db->exec('DELETE FROM import_previews WHERE expires_at<NOW()');echo count($rows).' expired preview(s) removed.'.PHP_EOL;exit(0);
+    }
+    echo "SPFPU console\n  migrate\n  seed:admin\n  imports:cleanup\n";
+} catch(Throwable $e){fwrite(STDERR,'Error: '.$e->getMessage().PHP_EOL);exit(1);}

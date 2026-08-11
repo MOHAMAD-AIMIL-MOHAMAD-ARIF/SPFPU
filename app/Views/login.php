@@ -1,0 +1,5 @@
+<?php use SPFPU\Core\{Csrf,Http,View}; ?>
+<section class="login-layout">
+  <div class="login-brand"><img src="/assets/uthm-logo.png" alt="Universiti Tun Hussein Onn Malaysia"><div><p class="eyebrow">Pejabat Penasihat Undang-Undang</p><h1>SPFPU</h1><p>Sistem Pengurusan Fail dan Persuratan untuk rekod surat masuk dan keluar.</p></div><small>Rekod metadata sahaja · Dokumen surat tidak disimpan</small></div>
+  <div class="login-panel"><p class="eyebrow">Akses dalaman</p><h2>Log masuk</h2><p class="muted">Gunakan username atau e-mel berdaftar.</p><form method="post" action="/login" class="form-stack"><?=Csrf::field()?><label>Username atau E-mel<input name="identity" value="<?=View::e(Http::old('identity'))?>" autocomplete="username" required autofocus></label><label>Kata Laluan<input type="password" name="password" autocomplete="current-password" required></label><button class="button primary" type="submit">Log masuk <span aria-hidden="true">→</span></button></form><p class="support-note">Masalah akses? Hubungi Admin SPFPU.</p></div>
+</section>
