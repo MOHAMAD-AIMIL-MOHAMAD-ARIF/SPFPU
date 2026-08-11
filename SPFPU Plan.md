@@ -111,7 +111,7 @@ Build a greenfield, production-ready internal records system for PPUU UTHM. SPFP
 * Validate the complete upload, show a preview with all row errors, and import all rows in one transaction only after the file is fully valid and confirmed.
 * Limit imports to 10,000 rows and a suitable fixed upload size; keep temporary files outside the web root and remove them after confirmation or expiry.
 * Global search is permission-filtered and covers entry text, type, date range, category, folder code/name, and volume. Export all matching authorized rows, not only the displayed page.
-* Provide 50-row server-side pagination and indexes for hierarchy keys, entry numbers, dates, types, archive state, normalized usernames/emails, folder codes, and access grants.
+* Provide 100-row server-side pagination for volume pages and indexes for hierarchy keys, entry numbers, dates, types, archive state, normalized usernames/emails, folder codes, and access grants.
 * Provide an Admin database-backup action that requires current-password re-authentication, streams a compressed SQL dump without retaining it on the server, disables response caching, and records the download. Restoration remains an external Linux/MariaDB administrator procedure.
 
 ## Test Plan
@@ -130,4 +130,3 @@ Build a greenfield, production-ready internal records system for PPUU UTHM. SPFP
 * Remarks and hierarchy descriptions are optional; the other specified entry fields are required.
 * No email delivery, self-service password recovery, notifications, multilingual UI, document attachments, public registration, external API, approval workflow, or in-application archive restoration is included.
 * Composer and Node-based test tooling are development dependencies; production serves locally bundled assets without CDN access.
-

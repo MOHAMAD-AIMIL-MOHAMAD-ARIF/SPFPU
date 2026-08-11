@@ -261,9 +261,9 @@ final class AppController
             Http::abort(404, "Jilid tidak ditemui.");
         }
         $page = max(1, (int) ($_GET["page"] ?? 1));
-        $offset = ($page - 1) * 50;
+        $offset = ($page - 1) * 100;
         $entries = $this->db->prepare(
-            "SELECT e.*,u.fullname author_name FROM entries e JOIN users u ON u.id=e.created_by WHERE e.volume_id=? AND e.archived_at IS NULL ORDER BY e.entry_no LIMIT 50 OFFSET " .
+            "SELECT e.*,u.fullname author_name FROM entries e JOIN users u ON u.id=e.created_by WHERE e.volume_id=? AND e.archived_at IS NULL ORDER BY e.entry_no LIMIT 100 OFFSET " .
                 $offset
         );
         $entries->execute([$volumeId]);
