@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace SPFPU\Controllers;
 
 use PDO;
-use SPFPU\Core\{Audit, Auth, Config, Database, Http, Validation, View};
+use SPFPU\Core\{Audit, Auth, Config, CsvImport, Database, Http, Validation, View};
 
 final class AppController
 {
@@ -623,10 +623,14 @@ final class AppController
                 $r["display_name"],
                 "Jilid " . $r["sequence_no"],
                 $r["entry_no"],
-                $r["type"] === "Incoming" ? "Masuk" : "Keluar",
-                View::date($r["letter_date"]),
+                $r["type"] === "Incoming"
+                    ? "Masuk"
+                    : ($r["type"] === "Outgoing"
+                        ? "Keluar"
+                        : ""),
+                $r["letter_date"] ? View::date($r["letter_date"]) : "",
                 $r["correspondent"],
-                View::date($r["movement_date"]),
+                $r["movement_date"] ? View::date($r["movement_date"]) : "",
                 $r["matter"],
                 $r["remarks"],
             ]);
@@ -732,17 +736,18 @@ final class AppController
             $no = filter_var($get("no"), FILTER_VALIDATE_INT, [
                 "options" => ["min_range" => 1],
             ]);
-            $type = mb_strtolower($get("type"));
-            $type = match ($type) {
-                "masuk", "incoming" => "Incoming",
-                "keluar", "outgoing" => "Outgoing",
-                default => "",
-            };
-            $letter = $this->importDate($get("letter_date"));
-            $movement = $this->importDate($get("movement_date"));
-            $matter = $get("matter");
-            $correspondent = $get("correspondent");
-            $remarks = $get("remarks");
+            [$type, $typeValid] = CsvImport::type($get("type"));
+            [$letter, $letterValid] = CsvImport::date($get("letter_date"));
+            [$movement, $movementValid] = CsvImport::date(
+                $get("movement_date")
+            );
+            $matterValue = $get("matter");
+            $correspondentValue = $get("correspondent");
+            $remarksValue = $get("remarks");
+            $matter = $matterValue === "" ? null : $matterValue;
+            $correspondent =
+                $correspondentValue === "" ? null : $correspondentValue;
+            $remarks = $remarksValue === "" ? null : $remarksValue;
             $rowErrors = [];
             if ($no === false) {
                 $rowErrors[] = "Bil. mesti nombor positif";
@@ -751,22 +756,22 @@ final class AppController
             } else {
                 $seen[$no] = true;
             }
-            if ($type === "") {
+            if (!$typeValid) {
                 $rowErrors[] = "Jenis tidak sah";
             }
-            if (!$letter) {
+            if (!$letterValid) {
                 $rowErrors[] = "Surat Bertarikh tidak sah";
             }
-            if (!$movement) {
+            if (!$movementValid) {
                 $rowErrors[] = "Dimasukkan/Dihantar tidak sah";
             }
-            if ($correspondent === "" || mb_strlen($correspondent) > 150) {
-                $rowErrors[] = "Daripada/Kepada diperlukan (maksimum 150)";
+            if ($correspondent !== null && mb_strlen($correspondent) > 150) {
+                $rowErrors[] = "Daripada/Kepada melebihi 150";
             }
-            if ($matter === "" || mb_strlen($matter) > 500) {
-                $rowErrors[] = "Perkara diperlukan (maksimum 500)";
+            if ($matter !== null && mb_strlen($matter) > 500) {
+                $rowErrors[] = "Perkara melebihi 500";
             }
-            if (mb_strlen($remarks) > 500) {
+            if ($remarks !== null && mb_strlen($remarks) > 500) {
                 $rowErrors[] = "Catatan melebihi 500";
             }
             if ($letter && $movement && $movement < $letter) {
@@ -1228,16 +1233,6 @@ final class AppController
             "matter" => $matter,
             "remarks" => $this->nullable("remarks"),
         ];
-    }
-    private function importDate(string $value): ?string
-    {
-        foreach (["!d.m.Y", "!Y-m-d", "!d/m/Y"] as $format) {
-            $d = \DateTimeImmutable::createFromFormat($format, $value);
-            if ($d && $d->format(substr($format, 1)) === $value) {
-                return $d->format("Y-m-d");
-            }
-        }
-        return null;
     }
     private function volume(int $id, bool $latest = false): array
     {

@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS volumes (
 
 CREATE TABLE IF NOT EXISTS entries (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, volume_id BIGINT UNSIGNED NOT NULL, entry_no INT UNSIGNED NOT NULL,
- type ENUM('Incoming','Outgoing') NOT NULL, letter_date DATE NOT NULL, correspondent VARCHAR(150) NOT NULL, movement_date DATE NOT NULL,
- matter VARCHAR(500) NOT NULL, remarks VARCHAR(500) NULL, archived_at DATETIME NULL, archived_by BIGINT UNSIGNED NULL, archive_batch CHAR(36) NULL,
+ type ENUM('Incoming','Outgoing') NULL, letter_date DATE NULL, correspondent VARCHAR(150) NULL, movement_date DATE NULL,
+ matter VARCHAR(500) NULL, remarks VARCHAR(500) NULL, archived_at DATETIME NULL, archived_by BIGINT UNSIGNED NULL, archive_batch CHAR(36) NULL,
  created_by BIGINT UNSIGNED NOT NULL, updated_by BIGINT UNSIGNED NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
  UNIQUE KEY uq_entry_no (volume_id,entry_no), KEY idx_entries_volume_archive (volume_id,archived_at), KEY idx_entries_dates (letter_date,movement_date), KEY idx_entries_type (type), FULLTEXT KEY ft_entries_text (correspondent,matter,remarks),
