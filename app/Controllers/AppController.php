@@ -260,13 +260,24 @@ final class AppController
         if (!$selected) {
             Http::abort(404, "Jilid tidak ditemui.");
         }
+        $q = trim((string) ($_GET["q"] ?? ""));
         $page = max(1, (int) ($_GET["page"] ?? 1));
         $offset = ($page - 1) * 100;
+        $entryWhere = ["e.volume_id=?", "e.archived_at IS NULL"];
+        $entryParams = [$volumeId];
+        if ($q !== "") {
+            $entryWhere[] =
+                "(e.correspondent LIKE ? OR e.matter LIKE ? OR e.remarks LIKE ?)";
+            $searchTerm = "%{$q}%";
+            array_push($entryParams, $searchTerm, $searchTerm, $searchTerm);
+        }
         $entries = $this->db->prepare(
-            "SELECT e.*,u.fullname author_name FROM entries e JOIN users u ON u.id=e.created_by WHERE e.volume_id=? AND e.archived_at IS NULL ORDER BY e.entry_no LIMIT 100 OFFSET " .
+            "SELECT e.*,u.fullname author_name FROM entries e JOIN users u ON u.id=e.created_by WHERE " .
+                implode(" AND ", $entryWhere) .
+                " ORDER BY e.entry_no LIMIT 100 OFFSET " .
                 $offset
         );
-        $entries->execute([$volumeId]);
+        $entries->execute($entryParams);
         $staff = [];
         $grants = [];
         if ($user["role"] === "Admin" && $folder["is_confidential"]) {
@@ -288,6 +299,7 @@ final class AppController
             "volume" => $selected,
             "entries" => $entries->fetchAll(),
             "page" => $page,
+            "q" => $q,
             "user" => $user,
             "staff" => $staff,
             "grants" => $grants,

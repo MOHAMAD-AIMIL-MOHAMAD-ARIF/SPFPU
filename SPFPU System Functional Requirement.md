@@ -92,6 +92,7 @@
 |FR-088|Authorization|System|The system shall prevent password hashes from appearing in the user interface, user directory, audit log, or CSV files.|
 |FR-089|Interface|User|The system shall provide a Bahasa Melayu user interface for category, folder, volume, entry, user, search, audit, CSV, and backup operations.|
 |FR-090|Interface|User|The system shall provide breadcrumbs, searchable folder lists, paginated entry tables, contextual actions, and a mobile filter drawer.|
+|FR-091|Entry Listing|User|The system shall allow users to search entries within the selected volume across the correspondent, matter, and remarks fields while retaining server-side pagination.|
 
 
 
