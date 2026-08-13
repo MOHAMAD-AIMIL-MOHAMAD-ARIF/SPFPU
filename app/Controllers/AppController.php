@@ -246,7 +246,7 @@ final class AppController
             );
         }
         $volumes = $this->db->prepare(
-            "SELECT v.*,COUNT(e.id) entry_count FROM volumes v LEFT JOIN entries e ON e.volume_id=v.id AND e.archived_at IS NULL WHERE v.folder_id=? AND v.archived_at IS NULL GROUP BY v.id ORDER BY v.sequence_no DESC"
+            "SELECT v.*,COUNT(e.id) entry_count,COALESCE((SELECT MAX(e_last.entry_no) FROM entries e_last WHERE e_last.volume_id=v.id),0) last_entry_no FROM volumes v LEFT JOIN entries e ON e.volume_id=v.id AND e.archived_at IS NULL WHERE v.folder_id=? AND v.archived_at IS NULL GROUP BY v.id ORDER BY v.sequence_no DESC"
         );
         $volumes->execute([(int) $id]);
         $volumes = $volumes->fetchAll();
