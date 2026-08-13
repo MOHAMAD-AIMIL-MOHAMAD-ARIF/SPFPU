@@ -1181,6 +1181,42 @@ final class AppController
         ) {
             $this->back("Kata laluan semasa tidak tepat.");
         }
+        $binary = Config::get("BACKUP_BINARY", "/usr/bin/mariadb-dump");
+        if (
+            $binary === null ||
+            $binary === "" ||
+            ((str_contains($binary, "/") || str_contains($binary, "\\")) &&
+                !is_file($binary))
+        ) {
+            Http::abort(500, "Utiliti sandaran tidak tersedia.");
+        }
+        $cmd = [
+            $binary,
+            "--single-transaction",
+            "--skip-lock-tables",
+            "--host=" . Config::get("DB_HOST", "127.0.0.1"),
+            "--port=" . Config::get("DB_PORT", "3306"),
+            "--user=" . Config::get("DB_USER", "spfpu"),
+            "--password=" . Config::get("DB_PASS", ""),
+            Config::get("DB_NAME", "spfpu"),
+        ];
+        $dump = @proc_open(
+            $cmd,
+            [1 => ["pipe", "w"], 2 => ["pipe", "w"]],
+            $pipes
+        );
+        if (!is_resource($dump)) {
+            Http::abort(500, "Utiliti sandaran tidak tersedia.");
+        }
+        $gzip = deflate_init(ZLIB_ENCODING_GZIP, ["level" => 9]);
+        if ($gzip === false) {
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            proc_terminate($dump);
+            proc_close($dump);
+            Http::abort(500, "Sandaran tidak dapat dimampatkan.");
+        }
+
         Audit::log("backup.downloaded", "database");
         session_write_close();
         header("Content-Type: application/gzip");
@@ -1191,29 +1227,13 @@ final class AppController
         );
         header("Cache-Control: no-store, no-cache, must-revalidate");
         header("Pragma: no-cache");
-        $cmd = [
-            Config::get("BACKUP_BINARY", "/usr/bin/mariadb-dump"),
-            "--single-transaction",
-            "--skip-lock-tables",
-            "--host=" . Config::get("DB_HOST", "127.0.0.1"),
-            "--port=" . Config::get("DB_PORT", "3306"),
-            "--user=" . Config::get("DB_USER", "spfpu"),
-            "--password=" . Config::get("DB_PASS", ""),
-            Config::get("DB_NAME", "spfpu"),
-        ];
-        $dump = proc_open(
-            $cmd,
-            [1 => ["pipe", "w"], 2 => ["pipe", "w"]],
-            $pipes
-        );
-        if (!is_resource($dump)) {
-            Http::abort(500, "Utiliti sandaran tidak tersedia.");
-        }
-        $gz = gzopen("php://output", "wb9");
         while (!feof($pipes[1])) {
-            gzwrite($gz, fread($pipes[1], 8192));
+            $chunk = fread($pipes[1], 8192);
+            if ($chunk !== false && $chunk !== "") {
+                echo deflate_add($gzip, $chunk, ZLIB_NO_FLUSH);
+            }
         }
-        gzclose($gz);
+        echo deflate_add($gzip, "", ZLIB_FINISH);
         fclose($pipes[1]);
         fclose($pipes[2]);
         proc_close($dump);
