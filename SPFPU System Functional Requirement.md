@@ -10,14 +10,14 @@
 |FR-006|Authentication|User|The system shall allow users to log out of the application.|
 |FR-007|Authentication|System|The system shall record successful and failed authentication attempts in the audit log.|
 |FR-008|Navigation|User|The system shall open the category workspace immediately after a successful login.|
-|FR-009|Category Management|Admin|The system shall allow an Admin to create, view, update, and archive categories.|
-|FR-010|Category Management|System|The system shall enforce case-insensitive uniqueness for category names.|
-|FR-011|Category Management|System|The system shall allow a category to have an optional description.|
+|FR-009|Category Management|Admin|The system shall allow an Admin to create, view, edit the name and description of, and archive categories.|
+|FR-010|Category Management|System|The system shall enforce case-insensitive uniqueness for category names when categories are created or edited.|
+|FR-011|Category Management|System|The system shall allow a category description to be optional when the category is created or edited.|
 |FR-012|Category Management|System|The system shall atomically archive all folders, volumes, and entries belonging to an archived category.|
-|FR-013|Folder Management|Admin|The system shall allow an Admin to create, view, update, and archive folders under a category.|
-|FR-014|Folder Management|System|The system shall require each folder to have a globally unique, case-insensitive file reference code.|
-|FR-015|Folder Management|System|The system shall allow different folders to use the same display name.|
-|FR-016|Folder Management|System|The system shall allow a folder to have an optional description.|
+|FR-013|Folder Management|Admin|The system shall allow an Admin to create, view, edit the reference code, display name, and description of, and archive folders under a category.|
+|FR-014|Folder Management|System|The system shall require each folder to have a globally unique, case-insensitive file reference code when the folder is created or edited.|
+|FR-015|Folder Management|System|The system shall allow different folders to use the same display name, including after a folder is edited.|
+|FR-016|Folder Management|System|The system shall allow a folder description to be optional when the folder is created or edited.|
 |FR-017|Folder Management|Admin|The system shall require the Admin to specify whether a folder is confidential when creating it.|
 |FR-018|Folder Management|System|The system shall prevent a folder’s confidentiality setting from being changed after creation.|
 |FR-019|Folder Management|System|The system shall atomically create `Jilid 1` when a new folder is created.|

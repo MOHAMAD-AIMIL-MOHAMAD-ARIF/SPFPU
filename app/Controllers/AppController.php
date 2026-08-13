@@ -180,6 +180,56 @@ final class AppController
         ]);
     }
 
+    public function editCategory(string $id): void
+    {
+        Auth::requireAdmin();
+        $name = trim((string) ($_POST["name"] ?? ""));
+        $description = $this->nullable("description");
+        if (
+            $name === "" ||
+            mb_strlen($name) > 150 ||
+            ($description !== null && mb_strlen($description) > 500)
+        ) {
+            $this->back(
+                "Nama kategori diperlukan dan keterangan tidak boleh melebihi 500 aksara."
+            );
+        }
+
+        $stmt = $this->db->prepare(
+            "SELECT * FROM categories WHERE id=? AND archived_at IS NULL"
+        );
+        $stmt->execute([(int) $id]);
+        $category = $stmt->fetch();
+        if (!$category) {
+            Http::abort(404, "Kategori tidak ditemui.");
+        }
+
+        try {
+            $this->db
+                ->prepare(
+                    "UPDATE categories SET name=?,name_norm=?,description=? WHERE id=?"
+                )
+                ->execute([
+                    $name,
+                    mb_strtolower($name),
+                    $description,
+                    (int) $id,
+                ]);
+        } catch (\PDOException $e) {
+            $this->back("Nama kategori telah digunakan.");
+        }
+
+        Audit::log("category.updated", "category", (int) $id, [
+            "name" => $category["name"],
+            "description" => $category["description"],
+        ], [
+            "name" => $name,
+            "description" => $description,
+        ]);
+        Http::flash("success", "Kategori berjaya dikemas kini.");
+        Http::redirect("/kategori/" . (int) $id);
+    }
+
     public function createFolder(string $categoryId): void
     {
         $user = Auth::requireAdmin();
@@ -226,6 +276,62 @@ final class AppController
         }
         Http::flash("success", "Fail dan Jilid 1 berjaya diwujudkan.");
         Http::redirect("/kategori/" . (int) $categoryId);
+    }
+
+    public function editFolder(string $id): void
+    {
+        Auth::requireAdmin();
+        $ref = trim((string) ($_POST["reference_code"] ?? ""));
+        $name = trim((string) ($_POST["display_name"] ?? ""));
+        $description = $this->nullable("description");
+        if (
+            $ref === "" ||
+            $name === "" ||
+            mb_strlen($ref) > 100 ||
+            mb_strlen($name) > 150 ||
+            ($description !== null && mb_strlen($description) > 500)
+        ) {
+            $this->back(
+                "Kod rujukan dan nama fail diperlukan; keterangan tidak boleh melebihi 500 aksara."
+            );
+        }
+
+        $stmt = $this->db->prepare(
+            "SELECT * FROM folders WHERE id=? AND archived_at IS NULL"
+        );
+        $stmt->execute([(int) $id]);
+        $folder = $stmt->fetch();
+        if (!$folder) {
+            Http::abort(404, "Fail tidak ditemui.");
+        }
+
+        try {
+            $this->db
+                ->prepare(
+                    "UPDATE folders SET reference_code=?,reference_code_norm=?,display_name=?,description=? WHERE id=?"
+                )
+                ->execute([
+                    $ref,
+                    mb_strtolower($ref),
+                    $name,
+                    $description,
+                    (int) $id,
+                ]);
+        } catch (\PDOException $e) {
+            $this->back("Kod rujukan telah digunakan.");
+        }
+
+        Audit::log("folder.updated", "folder", (int) $id, [
+            "reference_code" => $folder["reference_code"],
+            "display_name" => $folder["display_name"],
+            "description" => $folder["description"],
+        ], [
+            "reference_code" => $ref,
+            "display_name" => $name,
+            "description" => $description,
+        ]);
+        Http::flash("success", "Fail berjaya dikemas kini.");
+        Http::redirect("/fail/" . (int) $id);
     }
 
     public function folder(string $id): void
