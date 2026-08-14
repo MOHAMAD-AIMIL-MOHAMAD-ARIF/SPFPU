@@ -30,7 +30,7 @@ final class CsvImport
             return [null, true];
         }
 
-        foreach (['!d.m.Y', '!Y-m-d', '!d/m/Y'] as $format) {
+        foreach (['!d.m.Y', '!j.n.Y', '!Y-m-d', '!d/m/Y', '!j/n/Y'] as $format) {
             $date = \DateTimeImmutable::createFromFormat($format, $value);
             if ($date && $date->format(substr($format, 1)) === $value) {
                 return [$date->format('Y-m-d'), true];

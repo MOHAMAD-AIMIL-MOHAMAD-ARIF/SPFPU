@@ -37,7 +37,7 @@ Set `session.cookie_secure=1`, `session.cookie_httponly=1`, `session.cookie_same
 
 ## CSV
 
-Admin imports are only permitted for an empty current volume. The limit is 10,000 rows/5 MB. Accepted headers are: `No.`/`Bil.`, `Type`/`Jenis`/`Masuk/Keluar`, `DOL`/`Surat Bertarikh`, `From/To`/`Daripada/Kepada`, `Received/Sent`/`Dimasukkan/Dihantar`, `Matter`/`Perkara`, and `Remarks`/`Catatan`. Dates may use `DD.MM.YYYY`, `DD/MM/YYYY`, or ISO format during import. All imported fields except `No.`/`Bil.` may be blank; nonblank values are still validated.
+Admin imports are only permitted for an empty current volume. The limit is 10,000 rows/5 MB. Accepted headers are: `No.`/`Bil.`, `Type`/`Jenis`/`Masuk/Keluar`, `DOL`/`Surat Bertarikh`, `From/To`/`Daripada/Kepada`, `Received/Sent`/`Dimasukkan/Dihantar`, `Matter`/`Perkara`, and `Remarks`/`Catatan`. Dates may use `D.M.YYYY`, `D/M/YYYY` (with or without zero padding), or ISO format during import. All imported fields except `No.`/`Bil.` may be blank; nonblank values are still validated.
 
 ## Backup and recovery
 

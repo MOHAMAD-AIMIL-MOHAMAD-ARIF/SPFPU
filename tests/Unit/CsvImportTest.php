@@ -20,4 +20,11 @@ final class CsvImportTest extends TestCase
         self::assertSame(['2026-08-11', true], CsvImport::date('11.08.2026'));
         self::assertSame([null, false], CsvImport::date('31.02.2026'));
     }
+
+    public function testNonZeroPaddedDatesAreValid(): void
+    {
+        self::assertSame(['2026-08-01', true], CsvImport::date('1/8/2026'));
+        self::assertSame(['2026-08-01', true], CsvImport::date('1.8.2026'));
+        self::assertSame([null, false], CsvImport::date('31/2/2026'));
+    }
 }

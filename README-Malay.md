@@ -37,7 +37,7 @@ Tetapkan `session.cookie_secure=1`, `session.cookie_httponly=1`, `session.cookie
 
 ## CSV
 
-Import Admin hanya untuk jilid semasa yang kosong. Hadnya 10,000 baris/5 MB. Pengepala diterima: `No.`/`Bil.`, `Type`/`Jenis`/`Masuk/Keluar`, `DOL`/`Surat Bertarikh`, `From/To`/`Daripada/Kepada`, `Received/Sent`/`Dimasukkan/Dihantar`, `Matter`/`Perkara`, dan `Remarks`/`Catatan`. Tarikh boleh menggunakan `DD.MM.YYYY`, `DD/MM/YYYY`, atau ISO semasa import. Semua medan import kecuali `No.`/`Bil.` boleh dibiarkan kosong; nilai yang tidak kosong masih disahkan.
+Import Admin hanya untuk jilid semasa yang kosong. Hadnya 10,000 baris/5 MB. Pengepala diterima: `No.`/`Bil.`, `Type`/`Jenis`/`Masuk/Keluar`, `DOL`/`Surat Bertarikh`, `From/To`/`Daripada/Kepada`, `Received/Sent`/`Dimasukkan/Dihantar`, `Matter`/`Perkara`, dan `Remarks`/`Catatan`. Tarikh boleh menggunakan `D.M.YYYY`, `D/M/YYYY` (dengan atau tanpa sifar di hadapan), atau ISO semasa import. Semua medan import kecuali `No.`/`Bil.` boleh dibiarkan kosong; nilai yang tidak kosong masih disahkan.
 
 ## Sandaran dan pemulihan
 
