@@ -27,9 +27,9 @@
 |FR-023|Folder Access|Admin|The system shall allow an Admin to grant or revoke a Staff member’s access to a confidential folder.|
 |FR-024|Folder Access|System|The system shall apply a confidential-folder grant to all existing and future volumes in that folder.|
 |FR-025|Volume Management|User|The system shall display each volume using the format `Jilid N`.|
-|FR-026|Volume Management|System|The system shall assign an immutable sequence number to each volume.|
+|FR-026|Volume Management|System|The system shall treat each volume sequence number as immutable after any volume in its folder has ever contained an entry, including an archived entry.|
 |FR-027|Volume Management|Admin|The system shall allow an Admin to specify optional coverage start and end dates and an optional description for a volume.|
-|FR-028|Volume Management|Admin|The system shall allow an Admin to close the current volume and create `Jilid N+1` in a single transaction.|
+|FR-028|Volume Management|Admin|The system shall allow an Admin to close the current volume and create `Jilid N+1` in a single transaction, provided the new volume number does not exceed 200.|
 |FR-029|Volume Management|System|The system shall permit Staff to create entries only in the latest current volume and shall permit an Admin to create entries in either an open or closed volume.|
 |FR-030|Entry Management|Admin, Authorized Staff|The system shall allow an authorized user to read and update entries in an accessible volume and to create and archive entries in an accessible current volume, subject to the Admin exception for creating entries in closed volumes.|
 |FR-031|Entry Management|System|The system shall support Incoming and Outgoing entry types, displayed as `Masuk` and `Keluar`.|
@@ -94,6 +94,9 @@
 |FR-090|Interface|User|The system shall provide breadcrumbs, searchable folder lists, paginated entry tables, contextual actions, and a mobile filter drawer.|
 |FR-091|Entry Listing|User|The system shall allow users to search entries within the selected volume across the correspondent, matter, and remarks fields while retaining server-side pagination.|
 |FR-092|Entry Listing|User|The system shall display the last entry number used in the selected volume beside the entry search bar, or below it on small screens.|
+|FR-093|Volume Management|Admin|While every volume in a folder has never contained an entry, the system shall allow an Admin to increment or decrement the first volume number using up and down buttons.|
+|FR-094|Volume Management|System|The system shall atomically renumber every subsequent volume in the folder to preserve its order and shall require every resulting volume number to remain within 1 through 200.|
+|FR-095|Volume Management|System|When an Admin adds the folder's first entry or confirms its first CSV import, the system shall warn that completing the action will permanently fix the folder's volume numbering and shall require confirmation.|
 
 
 

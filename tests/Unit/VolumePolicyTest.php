@@ -26,4 +26,20 @@ final class VolumePolicyTest extends TestCase
         self::assertFalse(VolumePolicy::canImport("Admin", 1));
         self::assertFalse(VolumePolicy::canImport("Staff", 0));
     }
+
+    public function testOnlyAdminCanRenumberAnEntryFreeFolder(): void
+    {
+        self::assertTrue(VolumePolicy::canRenumber("Admin", 0));
+        self::assertFalse(VolumePolicy::canRenumber("Admin", 1));
+        self::assertFalse(VolumePolicy::canRenumber("Staff", 0));
+    }
+
+    public function testEveryResultingVolumeMustRemainBetweenOneAndTwoHundred(): void
+    {
+        self::assertTrue(VolumePolicy::isResultingRangeValid(1, 200));
+        self::assertTrue(VolumePolicy::isResultingRangeValid(198, 3));
+        self::assertFalse(VolumePolicy::isResultingRangeValid(0, 1));
+        self::assertFalse(VolumePolicy::isResultingRangeValid(199, 3));
+        self::assertFalse(VolumePolicy::isResultingRangeValid(1, 0));
+    }
 }

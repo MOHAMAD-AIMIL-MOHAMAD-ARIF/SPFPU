@@ -356,6 +356,15 @@ final class AppController
         );
         $volumes->execute([(int) $id]);
         $volumes = $volumes->fetchAll();
+        $numbering = $this->db->prepare(
+            "SELECT COUNT(DISTINCT v.id) volume_count,MIN(v.sequence_no) first_sequence,MAX(v.sequence_no) last_sequence,COUNT(e.id) entry_count FROM volumes v LEFT JOIN entries e ON e.volume_id=v.id WHERE v.folder_id=?"
+        );
+        $numbering->execute([(int) $id]);
+        $numbering = $numbering->fetch();
+        $numbering["editable"] = VolumePolicy::canRenumber(
+            $user["role"],
+            (int) $numbering["entry_count"]
+        );
         $volumeId = (int) ($_GET["jilid"] ?? ($volumes[0]["id"] ?? 0));
         $selected = null;
         foreach ($volumes as $v) {
@@ -409,6 +418,7 @@ final class AppController
             "user" => $user,
             "staff" => $staff,
             "grants" => $grants,
+            "numbering" => $numbering,
         ]);
     }
 
@@ -433,56 +443,81 @@ final class AppController
                 "Tarikh dimasukkan/dihantar lebih awal daripada tarikh surat. Tandakan pengesahan untuk meneruskan."
             );
         }
-        $id = Database::transaction(function (PDO $db) use (
-            $volumeId,
-            $user,
-            $data
-        ) {
-            $lock = $db->prepare(
-                "SELECT id,status FROM volumes WHERE id=? AND archived_at IS NULL FOR UPDATE"
-            );
-            $lock->execute([(int) $volumeId]);
-            $lockedVolume = $lock->fetch();
-            if (
-                !$lockedVolume ||
-                !VolumePolicy::canCreateEntry(
-                    $user["role"],
-                    $lockedVolume["status"]
-                )
+        try {
+            $id = Database::transaction(function (PDO $db) use (
+                $volumeId,
+                $user,
+                $data,
+                $volume
             ) {
-                throw new \RuntimeException(
-                    "Jilid telah ditutup dan hanya Admin boleh menambah entri."
+                $folderLock = $db->prepare(
+                    "SELECT id FROM folders WHERE id=? AND archived_at IS NULL FOR UPDATE"
                 );
-            }
-            $n = $db->prepare(
-                "SELECT COALESCE(MAX(entry_no),0)+1 FROM entries WHERE volume_id=?"
-            );
-            $n->execute([(int) $volumeId]);
-            $no = (int) $n->fetchColumn();
-            $db->prepare(
-                "INSERT INTO entries(volume_id,entry_no,type,letter_date,correspondent,movement_date,matter,remarks,created_by,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?)"
-            )->execute([
-                (int) $volumeId,
-                $no,
-                $data["type"],
-                $data["letter_date"],
-                $data["correspondent"],
-                $data["movement_date"],
-                $data["matter"],
-                $data["remarks"],
-                $user["id"],
-                $user["id"],
-            ]);
-            $id = (int) $db->lastInsertId();
-            Audit::log(
-                "entry.created",
-                "entry",
-                $id,
-                null,
-                $data + ["entry_no" => $no]
-            );
-            return $id;
-        });
+                $folderLock->execute([(int) $volume["folder_id"]]);
+                if (!$folderLock->fetch()) {
+                    throw new \RuntimeException("Fail tidak lagi tersedia.");
+                }
+                $lock = $db->prepare(
+                    "SELECT id,folder_id,status FROM volumes WHERE id=? AND archived_at IS NULL FOR UPDATE"
+                );
+                $lock->execute([(int) $volumeId]);
+                $lockedVolume = $lock->fetch();
+                if (
+                    !$lockedVolume ||
+                    !VolumePolicy::canCreateEntry(
+                        $user["role"],
+                        $lockedVolume["status"]
+                    )
+                ) {
+                    throw new \RuntimeException(
+                        "Jilid telah ditutup dan hanya Admin boleh menambah entri."
+                    );
+                }
+                $folderEntryCount = $db->prepare(
+                    "SELECT COUNT(*) FROM entries e JOIN volumes v ON v.id=e.volume_id WHERE v.folder_id=?"
+                );
+                $folderEntryCount->execute([(int) $lockedVolume["folder_id"]]);
+                if (
+                    $user["role"] === "Admin" &&
+                    (int) $folderEntryCount->fetchColumn() === 0 &&
+                    ($_POST["confirm_volume_numbering_fixed"] ?? "") !== "1"
+                ) {
+                    throw new \RuntimeException(
+                        "Sahkan bahawa entri pertama akan menetapkan nombor jilid fail ini secara kekal."
+                    );
+                }
+                $n = $db->prepare(
+                    "SELECT COALESCE(MAX(entry_no),0)+1 FROM entries WHERE volume_id=?"
+                );
+                $n->execute([(int) $volumeId]);
+                $no = (int) $n->fetchColumn();
+                $db->prepare(
+                    "INSERT INTO entries(volume_id,entry_no,type,letter_date,correspondent,movement_date,matter,remarks,created_by,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?)"
+                )->execute([
+                    (int) $volumeId,
+                    $no,
+                    $data["type"],
+                    $data["letter_date"],
+                    $data["correspondent"],
+                    $data["movement_date"],
+                    $data["matter"],
+                    $data["remarks"],
+                    $user["id"],
+                    $user["id"],
+                ]);
+                $id = (int) $db->lastInsertId();
+                Audit::log(
+                    "entry.created",
+                    "entry",
+                    $id,
+                    null,
+                    $data + ["entry_no" => $no]
+                );
+                return $id;
+            });
+        } catch (\RuntimeException $e) {
+            $this->back($e->getMessage());
+        }
         Http::flash("success", "Entri berjaya direkodkan.");
         Http::redirect(
             "/fail/" . $volume["folder_id"] . "?jilid=" . (int) $volumeId
@@ -562,37 +597,141 @@ final class AppController
     public function nextVolume(string $folderId): void
     {
         $user = Auth::requireAdmin();
-        $new = Database::transaction(function (PDO $db) use ($folderId, $user) {
-            $q = $db->prepare(
-                "SELECT id,sequence_no FROM volumes WHERE folder_id=? AND archived_at IS NULL ORDER BY sequence_no DESC LIMIT 1 FOR UPDATE"
-            );
-            $q->execute([(int) $folderId]);
-            $v = $q->fetch();
-            if (!$v) {
-                throw new \RuntimeException("Fail tidak sah.");
-            }
-            $db->prepare(
-                'UPDATE volumes SET status=\'Closed\',closed_at=NOW() WHERE id=?'
-            )->execute([$v["id"]]);
-            $n = (int) $v["sequence_no"] + 1;
-            $db->prepare(
-                'INSERT INTO volumes(folder_id,sequence_no,coverage_start,description,status,created_by) VALUES (?,?,?, ?,\'Open\',?)'
-            )->execute([
-                (int) $folderId,
-                $n,
-                $this->nullable("coverage_start"),
-                $this->nullable("description"),
-                $user["id"],
-            ]);
-            $id = (int) $db->lastInsertId();
-            Audit::log("volume.advanced", "folder", (int) $folderId, $v, [
-                "volume_id" => $id,
-                "sequence_no" => $n,
-            ]);
-            return $id;
-        });
+        try {
+            $new = Database::transaction(function (PDO $db) use ($folderId, $user) {
+                $folderLock = $db->prepare(
+                    "SELECT id FROM folders WHERE id=? AND archived_at IS NULL FOR UPDATE"
+                );
+                $folderLock->execute([(int) $folderId]);
+                if (!$folderLock->fetch()) {
+                    throw new \RuntimeException("Fail tidak sah.");
+                }
+                $q = $db->prepare(
+                    "SELECT id,sequence_no FROM volumes WHERE folder_id=? AND archived_at IS NULL ORDER BY sequence_no DESC LIMIT 1 FOR UPDATE"
+                );
+                $q->execute([(int) $folderId]);
+                $v = $q->fetch();
+                if (!$v) {
+                    throw new \RuntimeException("Fail tidak sah.");
+                }
+                $n = (int) $v["sequence_no"] + 1;
+                if ($n > VolumePolicy::MAX_SEQUENCE) {
+                    throw new \RuntimeException(
+                        "Jilid baharu tidak boleh melebihi Jilid " . VolumePolicy::MAX_SEQUENCE . "."
+                    );
+                }
+                $db->prepare(
+                    'UPDATE volumes SET status=\'Closed\',closed_at=NOW() WHERE id=?'
+                )->execute([$v["id"]]);
+                $db->prepare(
+                    'INSERT INTO volumes(folder_id,sequence_no,coverage_start,description,status,created_by) VALUES (?,?,?, ?,\'Open\',?)'
+                )->execute([
+                    (int) $folderId,
+                    $n,
+                    $this->nullable("coverage_start"),
+                    $this->nullable("description"),
+                    $user["id"],
+                ]);
+                $id = (int) $db->lastInsertId();
+                Audit::log("volume.advanced", "folder", (int) $folderId, $v, [
+                    "volume_id" => $id,
+                    "sequence_no" => $n,
+                ]);
+                return $id;
+            });
+        } catch (\RuntimeException $e) {
+            $this->back($e->getMessage());
+        }
         Http::flash("success", "Jilid semasa ditutup dan jilid baharu dibuka.");
         Http::redirect("/fail/" . (int) $folderId . "?jilid=" . $new);
+    }
+
+    public function shiftVolumeNumbers(string $folderId): void
+    {
+        $user = Auth::requireAdmin();
+        $direction = (string) ($_POST["direction"] ?? "");
+        if (!in_array($direction, ["up", "down"], true)) {
+            Http::abort(422, "Arah pelarasan nombor jilid tidak sah.");
+        }
+
+        try {
+            $result = Database::transaction(function (PDO $db) use ($folderId, $user, $direction) {
+                $folderLock = $db->prepare(
+                    "SELECT id FROM folders WHERE id=? AND archived_at IS NULL FOR UPDATE"
+                );
+                $folderLock->execute([(int) $folderId]);
+                if (!$folderLock->fetch()) {
+                    throw new \RuntimeException("Fail tidak sah.");
+                }
+                $q = $db->prepare(
+                    "SELECT id,sequence_no FROM volumes WHERE folder_id=? ORDER BY sequence_no,id FOR UPDATE"
+                );
+                $q->execute([(int) $folderId]);
+                $volumes = $q->fetchAll();
+                if (!$volumes) {
+                    throw new \RuntimeException("Fail tidak mempunyai jilid.");
+                }
+
+                $entryCount = $db->prepare(
+                    "SELECT COUNT(*) FROM entries e JOIN volumes v ON v.id=e.volume_id WHERE v.folder_id=?"
+                );
+                $entryCount->execute([(int) $folderId]);
+                if (!VolumePolicy::canRenumber($user["role"], (int) $entryCount->fetchColumn())) {
+                    throw new \RuntimeException(
+                        "Nombor jilid telah ditetapkan secara kekal kerana fail ini pernah mempunyai entri."
+                    );
+                }
+
+                $first = (int) $volumes[0]["sequence_no"];
+                $newFirst = $first + ($direction === "up" ? 1 : -1);
+                if (!VolumePolicy::isResultingRangeValid($newFirst, count($volumes))) {
+                    throw new \RuntimeException(
+                        "Semua nombor jilid mesti kekal antara Jilid 1 hingga Jilid 200."
+                    );
+                }
+
+                $before = array_map(
+                    fn(array $volume): array => [
+                        "volume_id" => (int) $volume["id"],
+                        "sequence_no" => (int) $volume["sequence_no"],
+                    ],
+                    $volumes
+                );
+                $maxCurrent = max(array_column($before, "sequence_no"));
+                $temporaryStart = max($maxCurrent, VolumePolicy::MAX_SEQUENCE) + count($volumes) + 1;
+                $update = $db->prepare("UPDATE volumes SET sequence_no=? WHERE id=?");
+                foreach ($volumes as $index => $volume) {
+                    $update->execute([$temporaryStart + $index, (int) $volume["id"]]);
+                }
+                $after = [];
+                foreach ($volumes as $index => $volume) {
+                    $sequence = $newFirst + $index;
+                    $update->execute([$sequence, (int) $volume["id"]]);
+                    $after[] = [
+                        "volume_id" => (int) $volume["id"],
+                        "sequence_no" => $sequence,
+                    ];
+                }
+                Audit::log(
+                    "volume.renumbered",
+                    "folder",
+                    (int) $folderId,
+                    ["volumes" => $before],
+                    ["volumes" => $after]
+                );
+                return [$newFirst, $newFirst + count($volumes) - 1];
+            });
+        } catch (\RuntimeException $e) {
+            $this->back($e->getMessage());
+        }
+
+        Http::flash(
+            "success",
+            $result[0] === $result[1]
+                ? "Nombor jilid dikemas kini kepada Jilid {$result[0]}."
+                : "Nombor jilid dikemas kini kepada Jilid {$result[0]}–{$result[1]}."
+        );
+        Http::redirect("/fail/" . (int) $folderId);
     }
 
     public function archiveBranch(string $type, string $id): void
@@ -948,6 +1087,10 @@ final class AppController
                 count($rows),
                 json_encode($warnings, JSON_UNESCAPED_UNICODE),
             ]);
+        $folderEntryCount = $this->db->prepare(
+            "SELECT COUNT(*) FROM entries e JOIN volumes v ON v.id=e.volume_id WHERE v.folder_id=?"
+        );
+        $folderEntryCount->execute([(int) $volume["folder_id"]]);
         View::render("import", [
             "title" => "Pratonton Import CSV",
             "rows" => array_slice($rows, 0, 20),
@@ -955,6 +1098,7 @@ final class AppController
             "warnings" => $warnings,
             "token" => $token,
             "volume" => $volume,
+            "fixesVolumeNumbering" => (int) $folderEntryCount->fetchColumn() === 0,
         ]);
     }
 
@@ -980,49 +1124,73 @@ final class AppController
             JSON_THROW_ON_ERROR
         );
         $volume = $this->volume((int) $preview["volume_id"]);
-        Database::transaction(function (PDO $db) use ($rows, $preview, $user) {
-            $lock = $db->prepare(
-                "SELECT id FROM volumes WHERE id=? AND archived_at IS NULL FOR UPDATE"
-            );
-            $lock->execute([$preview["volume_id"]]);
-            if (!$lock->fetch()) {
-                throw new \RuntimeException("Jilid tidak lagi tersedia.");
-            }
-            $count = $db->prepare(
-                "SELECT COUNT(*) FROM entries WHERE volume_id=?"
-            );
-            $count->execute([$preview["volume_id"]]);
-            if ((int) $count->fetchColumn() > 0) {
-                throw new \RuntimeException("Jilid tidak lagi kosong.");
-            }
-            $insert = $db->prepare(
-                "INSERT INTO entries(volume_id,entry_no,type,letter_date,correspondent,movement_date,matter,remarks,created_by,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?)"
-            );
-            foreach ($rows as $r) {
-                $insert->execute([
-                    $preview["volume_id"],
-                    $r["entry_no"],
-                    $r["type"],
-                    $r["letter_date"],
-                    $r["correspondent"],
-                    $r["movement_date"],
-                    $r["matter"],
-                    $r["remarks"],
-                    $user["id"],
-                    $user["id"],
+        try {
+            Database::transaction(function (PDO $db) use ($rows, $preview, $user, $volume) {
+                $folderLock = $db->prepare(
+                    "SELECT id FROM folders WHERE id=? AND archived_at IS NULL FOR UPDATE"
+                );
+                $folderLock->execute([(int) $volume["folder_id"]]);
+                if (!$folderLock->fetch()) {
+                    throw new \RuntimeException("Fail tidak lagi tersedia.");
+                }
+                $lock = $db->prepare(
+                    "SELECT id,folder_id FROM volumes WHERE id=? AND archived_at IS NULL FOR UPDATE"
+                );
+                $lock->execute([$preview["volume_id"]]);
+                $lockedVolume = $lock->fetch();
+                if (!$lockedVolume) {
+                    throw new \RuntimeException("Jilid tidak lagi tersedia.");
+                }
+                $count = $db->prepare(
+                    "SELECT COUNT(*) FROM entries WHERE volume_id=?"
+                );
+                $count->execute([$preview["volume_id"]]);
+                if ((int) $count->fetchColumn() > 0) {
+                    throw new \RuntimeException("Jilid tidak lagi kosong.");
+                }
+                $folderEntryCount = $db->prepare(
+                    "SELECT COUNT(*) FROM entries e JOIN volumes v ON v.id=e.volume_id WHERE v.folder_id=?"
+                );
+                $folderEntryCount->execute([(int) $lockedVolume["folder_id"]]);
+                if (
+                    (int) $folderEntryCount->fetchColumn() === 0 &&
+                    ($_POST["confirm_volume_numbering_fixed"] ?? "") !== "1"
+                ) {
+                    throw new \RuntimeException(
+                        "Sahkan bahawa import pertama akan menetapkan nombor jilid fail ini secara kekal."
+                    );
+                }
+                $insert = $db->prepare(
+                    "INSERT INTO entries(volume_id,entry_no,type,letter_date,correspondent,movement_date,matter,remarks,created_by,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?)"
+                );
+                foreach ($rows as $r) {
+                    $insert->execute([
+                        $preview["volume_id"],
+                        $r["entry_no"],
+                        $r["type"],
+                        $r["letter_date"],
+                        $r["correspondent"],
+                        $r["movement_date"],
+                        $r["matter"],
+                        $r["remarks"],
+                        $user["id"],
+                        $user["id"],
+                    ]);
+                }
+                Audit::log(
+                    "csv.imported",
+                    "volume",
+                    (int) $preview["volume_id"],
+                    null,
+                    ["rows" => count($rows)]
+                );
+                $db->prepare("DELETE FROM import_previews WHERE token=?")->execute([
+                    $preview["token"],
                 ]);
-            }
-            Audit::log(
-                "csv.imported",
-                "volume",
-                (int) $preview["volume_id"],
-                null,
-                ["rows" => count($rows)]
-            );
-            $db->prepare("DELETE FROM import_previews WHERE token=?")->execute([
-                $preview["token"],
-            ]);
-        });
+            });
+        } catch (\RuntimeException $e) {
+            $this->back($e->getMessage());
+        }
         @unlink($preview["temp_path"]);
         Http::flash(
             "success",

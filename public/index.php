@@ -12,7 +12,7 @@ if(isset($_SESSION['last_activity'])&&time()-(int)$_SESSION['last_activity']>(in
 $r=new Router();$c=AppController::class;
 $r->get('/login',[$c,'loginForm']);$r->post('/login',[$c,'login']);$r->post('/logout',[$c,'logout']);$r->get('/',[$c,'dashboard']);
 $r->post('/kategori',[$c,'createCategory']);$r->get('/kategori/{id}',[$c,'category']);$r->post('/kategori/{id}/kemas-kini',[$c,'editCategory']);$r->post('/kategori/{categoryId}/fail',[$c,'createFolder']);
-$r->get('/fail/{id}',[$c,'folder']);$r->post('/fail/{id}/kemas-kini',[$c,'editFolder']);$r->post('/fail/{folderId}/jilid',[$c,'nextVolume']);$r->post('/fail/{folderId}/akses',[$c,'grant']);$r->post('/arkib/{type}/{id}',[$c,'archiveBranch']);
+$r->get('/fail/{id}',[$c,'folder']);$r->post('/fail/{id}/kemas-kini',[$c,'editFolder']);$r->post('/fail/{folderId}/jilid',[$c,'nextVolume']);$r->post('/fail/{folderId}/nombor-jilid',[$c,'shiftVolumeNumbers']);$r->post('/fail/{folderId}/akses',[$c,'grant']);$r->post('/arkib/{type}/{id}',[$c,'archiveBranch']);
 $r->post('/jilid/{volumeId}/entri',[$c,'createEntry']);$r->post('/entri/{id}/kemas-kini',[$c,'editEntry']);$r->post('/entri/{id}/arkib',[$c,'archiveEntry']);
 $r->post('/jilid/{volumeId}/import',[$c,'importPreview']);$r->post('/import/sahkan',[$c,'importConfirm']);
 $r->get('/carian',[$c,'search']);$r->get('/carian/eksport',[$c,'export']);
