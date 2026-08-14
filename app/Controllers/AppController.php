@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace SPFPU\Controllers;
 
 use PDO;
-use SPFPU\Core\{Audit, Auth, Config, CsvImport, Database, Http, Validation, View};
+use SPFPU\Core\{Audit, Auth, Config, CsvImport, Database, Http, Validation, View, VolumePolicy};
 
 final class AppController
 {
@@ -352,7 +352,7 @@ final class AppController
             );
         }
         $volumes = $this->db->prepare(
-            "SELECT v.*,COUNT(e.id) entry_count,COALESCE((SELECT MAX(e_last.entry_no) FROM entries e_last WHERE e_last.volume_id=v.id),0) last_entry_no FROM volumes v LEFT JOIN entries e ON e.volume_id=v.id AND e.archived_at IS NULL WHERE v.folder_id=? AND v.archived_at IS NULL GROUP BY v.id ORDER BY v.sequence_no DESC"
+            "SELECT v.*,COUNT(e.id) entry_count,(SELECT COUNT(*) FROM entries e_all WHERE e_all.volume_id=v.id) total_entry_count,COALESCE((SELECT MAX(e_last.entry_no) FROM entries e_last WHERE e_last.volume_id=v.id),0) last_entry_no FROM volumes v LEFT JOIN entries e ON e.volume_id=v.id AND e.archived_at IS NULL WHERE v.folder_id=? AND v.archived_at IS NULL GROUP BY v.id ORDER BY v.sequence_no DESC"
         );
         $volumes->execute([(int) $id]);
         $volumes = $volumes->fetchAll();
@@ -416,13 +416,13 @@ final class AppController
     {
         $user = Auth::requireLogin();
         $data = $this->entryData();
-        $volume = $this->volume((int) $volumeId, true);
+        $volume = $this->volume((int) $volumeId);
         if (!Auth::canAccessFolder((int) $volume["folder_id"])) {
             Http::abort(403, "Akses tidak dibenarkan.");
         }
-        if ($volume["status"] !== "Open") {
+        if (!VolumePolicy::canCreateEntry($user["role"], $volume["status"])) {
             $this->back(
-                "Entri baharu hanya boleh dimasukkan ke jilid terkini yang masih dibuka."
+                "Hanya Admin boleh memasukkan entri baharu ke jilid yang telah ditutup."
             );
         }
         if (
@@ -439,11 +439,20 @@ final class AppController
             $data
         ) {
             $lock = $db->prepare(
-                'SELECT id FROM volumes WHERE id=? AND status=\'Open\' AND archived_at IS NULL FOR UPDATE'
+                "SELECT id,status FROM volumes WHERE id=? AND archived_at IS NULL FOR UPDATE"
             );
             $lock->execute([(int) $volumeId]);
-            if (!$lock->fetch()) {
-                throw new \RuntimeException("Jilid telah ditutup.");
+            $lockedVolume = $lock->fetch();
+            if (
+                !$lockedVolume ||
+                !VolumePolicy::canCreateEntry(
+                    $user["role"],
+                    $lockedVolume["status"]
+                )
+            ) {
+                throw new \RuntimeException(
+                    "Jilid telah ditutup dan hanya Admin boleh menambah entri."
+                );
             }
             $n = $db->prepare(
                 "SELECT COALESCE(MAX(entry_no),0)+1 FROM entries WHERE volume_id=?"
@@ -760,17 +769,19 @@ final class AppController
     public function importPreview(string $volumeId): void
     {
         $user = Auth::requireAdmin();
-        $volume = $this->volume((int) $volumeId, true);
-        if ($volume["status"] !== "Open") {
-            $this->back("Import hanya dibenarkan ke jilid semasa yang dibuka.");
-        }
+        $volume = $this->volume((int) $volumeId);
         $count = $this->db->prepare(
             "SELECT COUNT(*) FROM entries WHERE volume_id=?"
         );
         $count->execute([(int) $volumeId]);
-        if ((int) $count->fetchColumn() > 0) {
+        if (
+            !VolumePolicy::canImport(
+                $user["role"],
+                (int) $count->fetchColumn()
+            )
+        ) {
             $this->back(
-                "Import hanya dibenarkan ke jilid semasa yang benar-benar kosong."
+                "Import hanya dibenarkan ke jilid yang belum pernah mempunyai sebarang entri."
             );
         }
         $file = $_FILES["csv"] ?? null;
@@ -968,14 +979,14 @@ final class AppController
             512,
             JSON_THROW_ON_ERROR
         );
-        $volume = $this->volume((int) $preview["volume_id"], true);
+        $volume = $this->volume((int) $preview["volume_id"]);
         Database::transaction(function (PDO $db) use ($rows, $preview, $user) {
             $lock = $db->prepare(
-                'SELECT id FROM volumes WHERE id=? AND status=\'Open\' FOR UPDATE'
+                "SELECT id FROM volumes WHERE id=? AND archived_at IS NULL FOR UPDATE"
             );
             $lock->execute([$preview["volume_id"]]);
             if (!$lock->fetch()) {
-                throw new \RuntimeException("Jilid tidak lagi dibuka.");
+                throw new \RuntimeException("Jilid tidak lagi tersedia.");
             }
             $count = $db->prepare(
                 "SELECT COUNT(*) FROM entries WHERE volume_id=?"
@@ -1372,7 +1383,7 @@ final class AppController
             "remarks" => $this->nullable("remarks"),
         ];
     }
-    private function volume(int $id, bool $latest = false): array
+    private function volume(int $id): array
     {
         $s = $this->db->prepare(
             "SELECT v.*,f.category_id FROM volumes v JOIN folders f ON f.id=v.folder_id WHERE v.id=? AND v.archived_at IS NULL AND f.archived_at IS NULL"
@@ -1381,18 +1392,6 @@ final class AppController
         $r = $s->fetch();
         if (!$r) {
             Http::abort(404, "Jilid tidak ditemui.");
-        }
-        if ($latest) {
-            $m = $this->db->prepare(
-                "SELECT MAX(sequence_no) FROM volumes WHERE folder_id=? AND archived_at IS NULL"
-            );
-            $m->execute([$r["folder_id"]]);
-            if ((int) $r["sequence_no"] !== (int) $m->fetchColumn()) {
-                Http::abort(
-                    403,
-                    "Entri baharu hanya boleh dimasukkan ke jilid terkini."
-                );
-            }
         }
         return $r;
     }

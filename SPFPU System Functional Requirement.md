@@ -30,8 +30,8 @@
 |FR-026|Volume Management|System|The system shall assign an immutable sequence number to each volume.|
 |FR-027|Volume Management|Admin|The system shall allow an Admin to specify optional coverage start and end dates and an optional description for a volume.|
 |FR-028|Volume Management|Admin|The system shall allow an Admin to close the current volume and create `Jilid N+1` in a single transaction.|
-|FR-029|Volume Management|System|The system shall permit normal entry creation only in the latest current volume.|
-|FR-030|Entry Management|Admin, Authorized Staff|The system shall allow an authorized user to create, read, update, and archive entries in an accessible current volume.|
+|FR-029|Volume Management|System|The system shall permit Staff to create entries only in the latest current volume and shall permit an Admin to create entries in either an open or closed volume.|
+|FR-030|Entry Management|Admin, Authorized Staff|The system shall allow an authorized user to read and update entries in an accessible volume and to create and archive entries in an accessible current volume, subject to the Admin exception for creating entries in closed volumes.|
 |FR-031|Entry Management|System|The system shall support Incoming and Outgoing entry types, displayed as `Masuk` and `Keluar`.|
 |FR-032|Entry Management|System|The system shall require each entry to contain an entry number, type, letter date, From/To, received/sent date, and matter.|
 |FR-033|Entry Management|System|The system shall allow remarks to be omitted.|
@@ -43,7 +43,7 @@
 |FR-039|Entry Management|System|The system shall display dates in `DD.MM.YYYY` format.|
 |FR-040|Entry Management|System|The system shall warn the user when the received/sent date precedes the letter date and require confirmation before saving.|
 |FR-041|Entry Management|Admin|The system shall provide an Admin correction mode for editing existing entries in historical volumes.|
-|FR-042|Entry Management|System|The system shall prevent correction mode from creating or archiving entries in historical volumes.|
+|FR-042|Entry Management|System|The system shall prevent correction mode from archiving entries in historical volumes; creation of a new historical entry shall be available only to an Admin through the normal entry-creation action.|
 |FR-043|Archive Management|System|The system shall soft-delete archived records and record who archived them, when they were archived, and their archive-batch metadata.|
 |FR-044|Archive Management|System|The system shall exclude archived records from normal application browsing and operations.|
 |FR-045|Profile Management|User|The system shall allow every user to edit their own non-role profile fields.|
@@ -70,7 +70,7 @@
 |FR-066|CSV Import|Admin|The system shall restrict CSV import operations to Admin users.|
 |FR-067|CSV Import|System|The system shall accept documented Malay and English column aliases for imported entry data.|
 |FR-068|CSV Import|System|The system shall accept `Masuk` or `Incoming` for incoming entries and `Keluar` or `Outgoing` for outgoing entries.|
-|FR-069|CSV Import|System|The system shall allow CSV imports only into an empty current volume.|
+|FR-069|CSV Import|System|The system shall allow an Admin to import CSV data into an open or closed volume only when that volume has never contained any entry.|
 |FR-070|CSV Import|System|The system shall require imported entry numbers to be unique positive integers and include entry number 1.|
 |FR-071|CSV Import|System|The system shall permit gaps between imported entry numbers.|
 |FR-072|CSV Import|System|The system shall validate the complete uploaded CSV before importing any row.|
