@@ -40,6 +40,10 @@ final class Auth
     public static function login(array $user): void
     {
         session_regenerate_id(true);
+
+        unset($_SESSION['csrf']);
+        Csrf::token();
+
         $_SESSION['user_id'] = (int)$user['id'];
         $_SESSION['last_activity'] = time();
         self::$cached = null;

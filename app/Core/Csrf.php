@@ -15,9 +15,20 @@ final class Csrf
         return '<input type="hidden" name="_token" value="' . View::e(self::token()) . '">';
     }
 
+    public static function isValid(mixed $submittedToken): bool
+    {
+        $sessionToken = $_SESSION['csrf'] ?? null;
+
+        return is_string($sessionToken) &&
+            $sessionToken !== '' &&
+            is_string($submittedToken) &&
+            $submittedToken !== '' &&
+            hash_equals($sessionToken, $submittedToken);
+    }
+
     public static function verify(): void
     {
-        if (!hash_equals($_SESSION['csrf'] ?? '', (string)($_POST['_token'] ?? ''))) {
+        if (!self::isValid($_POST['_token'] ?? null)) {
             Http::abort(419, 'Sesi borang telah tamat. Sila cuba semula.');
         }
     }
