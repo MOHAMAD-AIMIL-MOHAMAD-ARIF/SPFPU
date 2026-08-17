@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace SPFPU\Controllers;
 
 use PDO;
-use SPFPU\Core\{Audit, Auth, Config, CsvImport, Database, Http, Validation, View, VolumePolicy};
+use SPFPU\Core\{Audit, Auth, Config, CsvExport, CsvImport, Database, Http, Validation, View, VolumePolicy};
 
 final class AppController
 {
@@ -883,7 +883,7 @@ final class AppController
             "Catatan",
         ]);
         while ($r = $stmt->fetch()) {
-            fputcsv($out, [
+            fputcsv($out, CsvExport::row([
                 $r["category_name"],
                 $r["reference_code"],
                 $r["display_name"],
@@ -899,7 +899,7 @@ final class AppController
                 $r["movement_date"] ? View::date($r["movement_date"]) : "",
                 $r["matter"],
                 $r["remarks"],
-            ]);
+            ]));
         }
         fclose($out);
         exit();
