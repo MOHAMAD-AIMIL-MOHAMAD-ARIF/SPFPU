@@ -51,5 +51,6 @@ Run `php tests/smoke.php` for checks without development dependencies, or `compo
 
 - `app/`, `database/`, `storage/`, `tests/`, `.env`, and backups are located outside the web root.
 - Do not log or export passwords/hashes. Audit logging filters sensitive field names.
+- Password changes and resets increment the account credential epoch, invalidating every existing session for that account on its next request. Deploy the migration before the matching application code; existing sessions are intentionally invalidated when this feature is first deployed.
 - Ensure that the `BACKUP_BINARY` binary exists and that the Apache account does not have broader shell access than necessary.
 - Monitor Apache/PHP logs and the rate of login attempts. Deactivated accounts cannot log in, but their history is retained.

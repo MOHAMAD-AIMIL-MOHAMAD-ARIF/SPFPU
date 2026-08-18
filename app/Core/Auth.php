@@ -13,11 +13,16 @@ final class Auth
     {
         if (!isset($_SESSION['user_id'])) return null;
         if (self::$cached) return self::$cached;
-        $stmt = Database::connection()->prepare('SELECT id, fullname, username, email, phone, role, status, reset_warning FROM users WHERE id=?');
+        $stmt = Database::connection()->prepare('SELECT id, fullname, username, email, phone, role, status, reset_warning, auth_version FROM users WHERE id=?');
         $stmt->execute([$_SESSION['user_id']]);
         $user = $stmt->fetch();
         if (!$user || $user['status'] !== 'Active') {
             self::logout();
+            return null;
+        }
+        if (!self::hasCurrentAuthVersion($user)) {
+            self::invalidate();
+            Http::flash('error', 'Sesi anda telah ditamatkan kerana kata laluan akaun berubah. Sila log masuk semula.');
             return null;
         }
         return self::$cached = $user;
@@ -45,8 +50,29 @@ final class Auth
         Csrf::token();
 
         $_SESSION['user_id'] = (int)$user['id'];
+        $_SESSION['auth_version'] = (int)$user['auth_version'];
         $_SESSION['last_activity'] = time();
         self::$cached = null;
+    }
+
+    public static function hasCurrentAuthVersion(array $user): bool
+    {
+        $sessionVersion = $_SESSION['auth_version'] ?? null;
+        $storedVersion = $user['auth_version'] ?? null;
+
+        return is_int($sessionVersion) &&
+            (is_int($storedVersion) || (is_string($storedVersion) && ctype_digit($storedVersion))) &&
+            $sessionVersion === (int)$storedVersion;
+    }
+
+    public static function invalidate(): void
+    {
+        self::$cached = null;
+        $_SESSION = [];
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
+        Csrf::token();
     }
 
     public static function logout(): void

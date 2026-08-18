@@ -51,5 +51,6 @@ Jalankan `php tests/smoke.php` untuk semakan tanpa dependensi pembangunan atau `
 
 - `app/`, `database/`, `storage/`, `tests/`, `.env`, dan sandaran berada di luar web root.
 - Jangan log atau eksport kata laluan/hash. Audit menyaring nama medan sensitif.
+- Perubahan dan penetapan semula kata laluan menaikkan versi kelayakan akaun, lalu membatalkan semua sesi sedia ada bagi akaun itu pada permintaan seterusnya. Laksanakan migrasi sebelum kod aplikasi yang sepadan; sesi sedia ada sengaja dibatalkan apabila ciri ini mula digunakan.
 - Pastikan binari `BACKUP_BINARY` wujud dan akaun Apache tidak mempunyai akses shell yang lebih luas daripada perlu.
 - Pantau log Apache/PHP dan kadar cubaan log masuk. Akaun dinyahaktif tidak boleh log masuk tetapi sejarahnya dikekalkan.

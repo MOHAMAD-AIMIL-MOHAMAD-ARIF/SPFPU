@@ -1319,13 +1319,21 @@ final class AppController
         } elseif ($action === "reset") {
             $this->db
                 ->prepare(
-                    "UPDATE users SET password_hash=?,reset_warning=1 WHERE id=?"
+                    "UPDATE users SET password_hash=?,reset_warning=1,auth_version=auth_version+1 WHERE id=?"
                 )
                 ->execute([
                     password_hash("Passw123", PASSWORD_ARGON2ID),
                     (int) $id,
                 ]);
             Audit::log("user.password_reset", "user", (int) $id);
+            if ((int) $id === (int) $actor["id"]) {
+                Auth::invalidate();
+                Http::flash(
+                    "success",
+                    "Kata laluan anda telah ditetapkan semula. Sila log masuk semula."
+                );
+                Http::redirect("/login");
+            }
         } elseif ($action === "deactivate") {
             $this->assertAdminPreserved($target);
             $this->db
@@ -1445,13 +1453,16 @@ final class AppController
         }
         $this->db
             ->prepare(
-                "UPDATE users SET password_hash=?,reset_warning=0 WHERE id=?"
+                "UPDATE users SET password_hash=?,reset_warning=0,auth_version=auth_version+1 WHERE id=?"
             )
             ->execute([password_hash($new, PASSWORD_ARGON2ID), $user["id"]]);
         Audit::log("profile.password_changed", "user", (int) $user["id"]);
-        session_regenerate_id(true);
-        Http::flash("success", "Kata laluan berjaya ditukar.");
-        Http::redirect("/profil");
+        Auth::invalidate();
+        Http::flash(
+            "success",
+            "Kata laluan berjaya ditukar. Sila log masuk semula."
+        );
+        Http::redirect("/login");
     }
 
     public function audit(): void

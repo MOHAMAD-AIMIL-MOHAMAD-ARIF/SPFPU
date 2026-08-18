@@ -97,6 +97,8 @@
 |FR-093|Volume Management|Admin|While every volume in a folder has never contained an entry, the system shall allow an Admin to increment or decrement the first volume number using up and down buttons.|
 |FR-094|Volume Management|System|The system shall atomically renumber every subsequent volume in the folder to preserve its order and shall require every resulting volume number to remain within 1 through 200.|
 |FR-095|Volume Management|System|When an Admin adds the folder's first entry or confirms its first CSV import, the system shall warn that completing the action will permanently fix the folder's volume numbering and shall require confirmation.|
+|FR-096|Password Management|System|The system shall invalidate all authenticated sessions for an account after its password is changed or reset.|
+|FR-097|Password Management|System|After changing or resetting their own password, the current user shall be signed out and required to log in again.|
 
 
 
