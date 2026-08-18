@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace SPFPU\Controllers;
 
 use PDO;
-use SPFPU\Core\{Audit, Auth, Config, CsvExport, CsvImport, Database, Http, Validation, View, VolumePolicy};
+use SPFPU\Core\{Audit, Auth, Config, CsvExport, CsvImport, Database, Http, ImportPreviewStorage, Validation, View, VolumePolicy};
 
 final class AppController
 {
@@ -1065,28 +1065,37 @@ final class AppController
         if (!isset($seen[1])) {
             $errors[] = "CSV mesti mengandungi Bil. 1.";
         }
-        $token = bin2hex(random_bytes(32));
-        $path = Config::root() . "/storage/imports/" . $token . ".json";
-        file_put_contents(
-            $path,
-            json_encode($rows, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
-            LOCK_EX
-        );
-        $this->db
-            ->prepare("DELETE FROM import_previews WHERE expires_at<NOW()")
-            ->execute();
-        $this->db
-            ->prepare(
-                "INSERT INTO import_previews(token,user_id,volume_id,temp_path,row_count,warnings,expires_at) VALUES (?,?,?,?,?,?,DATE_ADD(NOW(),INTERVAL 30 MINUTE))"
-            )
-            ->execute([
-                $token,
-                $user["id"],
-                (int) $volumeId,
+        $this->cleanupExpiredImportPreviews();
+        $token = "";
+        if (!$errors) {
+            $token = bin2hex(random_bytes(32));
+            $path = Config::root() . "/storage/imports/" . $token . ".json";
+            $written = file_put_contents(
                 $path,
-                count($rows),
-                json_encode($warnings, JSON_UNESCAPED_UNICODE),
-            ]);
+                json_encode($rows, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                LOCK_EX
+            );
+            if ($written === false) {
+                Http::abort(500, "Pratonton import tidak dapat disimpan.");
+            }
+            try {
+                $this->db
+                    ->prepare(
+                        "INSERT INTO import_previews(token,user_id,volume_id,temp_path,row_count,warnings,expires_at) VALUES (?,?,?,?,?,?,DATE_ADD(NOW(),INTERVAL 30 MINUTE))"
+                    )
+                    ->execute([
+                        $token,
+                        $user["id"],
+                        (int) $volumeId,
+                        $path,
+                        count($rows),
+                        json_encode($warnings, JSON_UNESCAPED_UNICODE),
+                    ]);
+            } catch (\Throwable $e) {
+                @unlink($path);
+                throw $e;
+            }
+        }
         $folderEntryCount = $this->db->prepare(
             "SELECT COUNT(*) FROM entries e JOIN volumes v ON v.id=e.volume_id WHERE v.folder_id=?"
         );
@@ -1117,14 +1126,15 @@ final class AppController
                 "Pratonton import telah tamat. Muat naik semula CSV."
             );
         }
-        $rows = json_decode(
-            (string) file_get_contents($preview["temp_path"]),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
-        $volume = $this->volume((int) $preview["volume_id"]);
+        $importError = null;
         try {
+            $rows = json_decode(
+                (string) file_get_contents($preview["temp_path"]),
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+            $volume = $this->volume((int) $preview["volume_id"]);
             Database::transaction(function (PDO $db) use ($rows, $preview, $user, $volume) {
                 $folderLock = $db->prepare(
                     "SELECT id FROM folders WHERE id=? AND archived_at IS NULL FOR UPDATE"
@@ -1184,14 +1194,19 @@ final class AppController
                     null,
                     ["rows" => count($rows)]
                 );
-                $db->prepare("DELETE FROM import_previews WHERE token=?")->execute([
-                    $preview["token"],
-                ]);
             });
         } catch (\RuntimeException $e) {
-            $this->back($e->getMessage());
+            $importError = $e->getMessage();
+        } finally {
+            if ($this->purgeImportPreviews([$preview]) === 0) {
+                $this->db
+                    ->prepare("UPDATE import_previews SET expires_at=NOW() WHERE token=?")
+                    ->execute([$preview["token"]]);
+            }
         }
-        @unlink($preview["temp_path"]);
+        if ($importError !== null) {
+            $this->back($importError);
+        }
         Http::flash(
             "success",
             count($rows) . " entri berjaya diimport dalam satu transaksi."
@@ -1607,6 +1622,27 @@ final class AppController
         return compact("fullname", "username", "email", "role") + [
             "phone" => $this->nullable("phone"),
         ];
+    }
+    private function cleanupExpiredImportPreviews(): void
+    {
+        $previews = $this->db
+            ->query(
+                "SELECT token,temp_path FROM import_previews WHERE expires_at<NOW()"
+            )
+            ->fetchAll();
+        $this->purgeImportPreviews($previews);
+    }
+    private function purgeImportPreviews(array $previews): int
+    {
+        $delete = $this->db->prepare(
+            "DELETE FROM import_previews WHERE token=?"
+        );
+        return ImportPreviewStorage::purge(
+            $previews,
+            static function (string $token) use ($delete): void {
+                $delete->execute([$token]);
+            }
+        );
     }
     private function assertAdminPreserved(array $target): void
     {
