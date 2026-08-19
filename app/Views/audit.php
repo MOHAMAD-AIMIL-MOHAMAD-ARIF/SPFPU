@@ -1,2 +1,24 @@
-<?php use SPFPU\Core\{Csrf,View}; ?>
-<header class="page-head"><div><p class="eyebrow">Pentadbiran</p><h1>Sejarah Audit</h1><p>Perubahan data, akses, pengguna, autentikasi dan muat turun sandaran.</p></div><button class="button quiet" data-dialog-open="sandaran">Muat turun sandaran</button></header><div class="audit-list"><?php foreach($logs as $log):?><article><time><?=View::e((new DateTimeImmutable($log['created_at']))->format('d.m.Y H:i:s'))?></time><div><strong><?=View::e($log['action'])?></strong><span><?=View::e($log['target_type'])?><?=isset($log['target_id'])?' #'.(int)$log['target_id']:''?></span></div><span><?=View::e($log['actor_name']?:'Sistem')?><small><?=View::e($log['ip_address'])?></small></span></article><?php endforeach?></div><nav class="pagination"><a class="button quiet <?=$page<=1?'disabled':''?>" href="?page=<?=max(1,$page-1)?>">← Sebelum</a><span>Halaman <?=$page?></span><a class="button quiet <?=count($logs)<50?'disabled':''?>" href="?page=<?=$page+1?>">Seterusnya →</a></nav><dialog id="sandaran"><form method="post" action="/admin/sandaran" class="dialog-form"><?=Csrf::field()?><h2>Muat turun sandaran</h2><p>Masukkan kata laluan semasa. Fail SQL termampat akan distrim dan tidak disimpan pada pelayan.</p><label>Kata Laluan<input type="password" name="password" required></label><footer><button type="button" class="button quiet" data-dialog-close>Batal</button><button class="button primary">Sahkan & muat turun</button></footer></form></dialog>
+<?php use SPFPU\Core\{Csrf, View}; ?>
+<header class="page-head"><div><p class="eyebrow">Pentadbiran</p><h1>Sejarah Audit</h1><p>Perubahan data, akses, pengguna, autentikasi dan muat turun sandaran.</p></div><button class="button quiet" data-dialog-open="sandaran">Muat turun sandaran</button></header><div class="audit-list"><?php foreach (
+    $logs
+    as $log
+): ?><article><time><?= View::e(
+    (new DateTimeImmutable($log["created_at"]))->format("d.m.Y H:i:s")
+) ?></time><div><strong><?= View::e($log["action"]) ?></strong><span><?=
+View::e($log["target_type"]) . (isset($log["target_id"]) ? " #" . (int) $log["target_id"] : "")
+?></span></div><span><?= View::e(
+    $log["actor_name"] ?: "Sistem"
+) ?><small><?= View::e(
+    $log["ip_address"]
+) ?></small></span></article><?php endforeach; ?></div><nav class="pagination"><a class="button quiet <?= $page <=
+1
+    ? "disabled"
+    : "" ?>" href="?page=<?= max(
+    1,
+    $page - 1
+) ?>">← Sebelum</a><span>Halaman <?= $page ?></span><a class="button quiet <?= count(
+    $logs
+) < 50
+    ? "disabled"
+    : "" ?>" href="?page=<?= $page +
+    1 ?>">Seterusnya →</a></nav><dialog id="sandaran"><form method="post" action="/admin/sandaran" class="dialog-form"><?= Csrf::field() ?><h2>Muat turun sandaran</h2><p>Masukkan kata laluan semasa. Fail SQL termampat akan distrim dan tidak disimpan pada pelayan.</p><label>Kata Laluan<input type="password" name="password" required></label><footer><button type="button" class="button quiet" data-dialog-close>Batal</button><button class="button primary">Sahkan & muat turun</button></footer></form></dialog>
